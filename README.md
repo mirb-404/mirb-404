@@ -3,7 +3,7 @@
 
 **Software Engineer | GenAI · Agents · Full-Stack**
 
-Software engineer who treats production like a playground ☠️. Building **AI-powered, fully offline applications** and **agentic workflows**. Proficient in **CI/CD**, and **full-stack integrations**.
+Building **AI-powered, fully offline applications** and **agentic workflows**. Proficient in **CI/CD**, and **full-stack integrations**.
 
 ## Currently working on..
 
