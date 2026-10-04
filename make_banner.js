@@ -13,8 +13,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const W = 1000, H = 560;
-const LOOP = 22; // seconds, then the session replays
+const W = 1000, H = 480;
+const LOOP = 18; // seconds, then the session replays
 const MONO = "ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, Menlo, monospace";
 const SANS = "ui-sans-serif, -apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
 const COL = 144; // where every line's text starts, after its `label >`
@@ -72,6 +72,10 @@ const ICONS = {
     '100000001', '111111111'],
   linkedin: ['100000', '000000', '101110', '101001', '101001', '101001', '101001'],
   xlogo: ['1000001', '0100010', '0010100', '0001000', '0010100', '0100010', '1000001'],
+  heart: ['01110001110', '11111011111', '11111111111', '11111111111', '01111111110',
+    '00111111100', '00011111000', '00001110000', '00000100000'],
+  clipboard: ['00111111100', '11100000111', '10000000001', '10111111001', '10000000001',
+    '10111100001', '10000000001', '10111110001', '11111111111'],
   bolt: ['00000011110', '00000111100', '00001111000', '00011111110', '00111111100',
     '00000111000', '00001110000', '00011100000', '00011000000'],
 };
@@ -183,61 +187,13 @@ class Svg {
     this.add(`<path d="${bitmapPath(ICONS[name], x, y, px)}" fill="${color}"/>`);
   }
 
-  // Cycles through pixel-text frames, landing on the last one at `end`
-  pixelCounter(x, y, frames, end, px, color, span = 1.1) {
-    const n = frames.length;
-    frames.forEach((value, i) => {
-      const last = i === n - 1;
-      if (!this.a && !last) return;
-      const t0 = end - span + span * i / (n - 1);
-      const [attr, anim] = this.window(t0, last ? null : end - span + span * (i + 1) / (n - 1));
-      this.add(`<g${attr}>${anim}${last ? `<g>${this.jitter(t0, px / 2)}` : '<g>'}`);
-      this.pixel(x, y, value, px, last ? color : SOFT);
-      this.add('</g></g>');
-    });
-  }
-
-  // ── shapes ─────────────────────────────────────────────────────────────────
-  // A stroke that draws itself in
-  draw(d, len, start, dur, stroke, { width = 2, extra = '' } = {}) {
-    if (!this.a) return this.add(`<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${width}"${extra}/>`);
-    this.add(`<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-dasharray="${len}" ` +
-      `stroke-dashoffset="${len}"${extra}><set attributeName="stroke-dashoffset" to="${len}" begin="loop.begin"/>` +
-      `<animate attributeName="stroke-dashoffset" from="${len}" to="0" dur="${dur}s" begin="${at(start)}" ` +
-      'fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.4 0 0.2 1"/></path>');
-  }
-
-  // A horizontal bar that grows to width w
-  grow(x, y, w, h, color, start, dur, { rx = 2, discrete = false } = {}) {
-    if (!this.a) return this.add(`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="${color}"/>`);
-    const how = discrete
-      ? `values="${Array.from({ length: 17 }, (_, i) => r1(w * i / 16)).join(';')}" calcMode="discrete"`
-      : `from="0" to="${w}" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.25 1"`;
-    this.add(`<rect x="${x}" y="${y}" width="0" height="${h}" rx="${rx}" fill="${color}">` +
-      '<set attributeName="width" to="0" begin="loop.begin"/>' +
-      `<animate attributeName="width" ${how} begin="${at(start)}" dur="${dur}s" fill="freeze"/></rect>`);
-  }
-
-  // Chunky progress line with a glowing head, like a build step running
-  progress(x1, x2, y, color, start, dur) {
-    this.add(`<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${TRACK}" stroke-width="2"/>`);
-    this.grow(x1, y - 1, x2 - x1, 2, color, start, dur, { rx: 0, discrete: true });
-    if (!this.a) return;
-    const xs = Array.from({ length: 17 }, (_, i) => r1(x1 + (x2 - x1 - 6) * i / 16)).join(';');
-    this.add(`<rect y="${y - 3}" width="6" height="6" fill="${color}" filter="url(#glow)" opacity="0">` +
-      `<animate attributeName="x" values="${xs}" dur="${dur}s" begin="${at(start)}" calcMode="discrete" fill="freeze"/>` +
-      `<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.92;1" dur="${dur + 0.1}s" begin="${at(start)}" fill="freeze"/>` +
-      '<set attributeName="opacity" to="0" begin="loop.begin"/></rect>');
-  }
-
-  // A dot that pops in with a ring ripple
-  pop(cx, cy, color, start) {
-    if (!this.a) return this.add(`<circle cx="${cx}" cy="${cy}" r="4" fill="${color}"/>`);
-    this.add(`<circle cx="${cx}" cy="${cy}" r="0" fill="${color}"><set attributeName="r" to="0" begin="loop.begin"/>` +
-      `<animate attributeName="r" values="0;6;4" keyTimes="0;0.6;1" dur="0.3s" begin="${at(start)}" fill="freeze"/></circle>` +
-      `<circle cx="${cx}" cy="${cy}" r="4" fill="none" stroke="${color}" stroke-width="1.5" opacity="0">` +
-      `<animate attributeName="r" from="4" to="14" dur="0.6s" begin="${at(start)}"/>` +
-      `<animate attributeName="opacity" from="0.9" to="0" dur="0.6s" begin="${at(start)}"/></circle>`);
+  // An "in progress" bar: a lit segment sliding back and forth forever
+  busy(x, y, w, color, phase = 0) {
+    this.add(`<rect x="${x}" y="${y}" width="${w}" height="4" rx="2" fill="${TRACK}"/>`);
+    const seg = Math.round(w * 0.3);
+    const anim = this.a ? `<animate attributeName="x" values="${x};${x + w - seg};${x}" dur="2.4s" begin="${-phase}s" ` +
+      'repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.45 0 0.55 1;0.45 0 0.55 1"/>' : '';
+    this.add(`<rect x="${x + (w - seg) / 2}" y="${y}" width="${seg}" height="4" rx="2" fill="${color}">${anim}</rect>`);
   }
 
   // A rubber stamp that slams down
@@ -261,29 +217,29 @@ class Svg {
 }
 
 // ── SCRIPT ───────────────────────────────────────────────────────────────────
-// The crew the agent wakes up. Each one reports back as a card on the right.
-const CREW = [
-  { name: 'OFFLINE', icon: 'wifi', color: GREEN, sub: 'mindwell, runs local', note: 'cloud calls: 0' },
-  { name: 'HACKATHONS', icon: 'trophy', color: BLUE, sub: '3 builds, 2025-26', note: 'Berlin, Mannheim, online' },
-  { name: 'WALLET', icon: 'coin', color: YELLOW, sub: 'mcpay, agents that pay', note: 'budget: half a cent' },
-  { name: 'SPEEDRUN', icon: 'bolt', color: ORANGE, sub: 'hdr2sdr, 4k video', note: 'racing 4K vs 1080p' },
+// What he's built so far: one plain sentence each
+const BUILT = [
+  { name: 'MINDWELL', icon: 'heart', color: GREEN, where: 'Google DeepMind hackathon, 2025',
+    what: 'a private AI wellness app that runs fully offline' },
+  { name: 'MCPAY', icon: 'coin', color: YELLOW, where: 'Algorand hackathon, Berlin 2026',
+    what: 'lets AI agents pay for the tools they use' },
+  { name: 'TENDERFLOW', icon: 'clipboard', color: PURPLE, where: 'Q-Hack Mannheim 2026, team of 3',
+    what: "drafts tender answers, then waits for a human's OK" },
+  { name: 'HDR2SDR', icon: 'bolt', color: ORANGE, where: 'live on Vercel',
+    what: 'private HDR to SDR video converter, no account needed' },
 ];
 
-const CW = 236, CH = 110; // card size
-const CARD_AT = [[470, 140], [720, 140], [470, 262], [720, 262]];
+// What he's doing right now
+const NOW = [
+  ['MSc Applied Data Science & AI', 'SRH Heidelberg: NLP, ML, big data, AI ethics'],
+  ['AI/ML Engineer at Deutsche Bank', 'research partner, applied LLM research'],
+  ['Learning Rust', 'by rebuilding git from scratch'],
+  ['Offline AI desktop apps', 'built with Electron'],
+];
 
-function card(s, i, t, title, tag, body) {
-  const [x, y] = CARD_AT[i], color = CREW[i].color;
-  s.add(`<g transform="translate(${x} ${y})">`);
-  s.group(t, () => {
-    s.add(`<rect width="${CW}" height="${CH}" rx="6" fill="${CARD}" stroke="${BORDER}"/>`);
-    s.add(`<path d="M0 6a6 6 0 0 1 6-6v${CH}a6 6 0 0 1-6-6z" fill="${color}"/>`);
-    s.pixel(16, 13, title, 2, SOFT);
-    s.text(CW - 12, 25, tag, { color, size: 10, weight: 'bold', anchor: 'end' });
-    body();
-  }, { mode: 'flicker', shake: 3 });
-  s.add('</g>');
-}
+// Tech he's fluent in, and what he's into
+const FLUENT = ['Python', 'TypeScript', 'JavaScript', 'SQL', 'React', 'LangGraph', 'MCP', 'Ollama'];
+const INTO = ['offline-first AI', 'AI agents', 'LLM evals', 'local models', 'Rust', 'hackathons'];
 
 function session(s) {
   // Window chrome
@@ -296,9 +252,9 @@ function session(s) {
   // ── the question ──
   s.group(0.2, () => s.text(40, 85, 'you >', { color: GREEN }));
   const titleEnd = s.pixelTyped(COL, 61, 'WHO IS MIRANG?', 4, TEXT, 0.45, 0.075);
-  s.cursor(COL + pixelWidth('WHO IS MIRANG?', 4) + 8, 61, 14, 28, TEXT, titleEnd, 3.2);
+  s.cursor(COL + pixelWidth('WHO IS MIRANG?', 4) + 8, 61, 14, 28, TEXT, titleEnd, 2.0);
   // a chromatic glitch on the title, once early and once while the answer sits there
-  if (s.a) for (const g of [titleEnd + 0.15, 15.2]) {
+  if (s.a) for (const g of [titleEnd + 0.15, 13]) {
     for (const [c, dx] of [[PINK, -3], [CYAN, 3]]) {
       s.add(`<g opacity="0" transform="translate(${dx} 0)"><set attributeName="opacity" to="0" begin="loop.begin"/>` +
         `<animate attributeName="opacity" values="0.75;0;0.6;0" dur="0.22s" begin="${at(g)}" calcMode="discrete"/>`);
@@ -307,110 +263,67 @@ function session(s) {
     }
   }
 
-  s.line(118, 'agent', PURPLE, [["Wi-Fi's off. Fine, it all runs local. Waking the crew: ", SOFT],
-    ['/offline ', GREEN, 'bold'], ['/hackathons ', BLUE, 'bold'], ['/wallet ', YELLOW, 'bold'], ['/speedrun', ORANGE, 'bold']],
-  2.05, { step: 0.06 });
+  s.line(118, 'agent', PURPLE, [['Software engineer in Mannheim. He builds ', SOFT], ['AI apps that run offline', GREEN, 'bold'],
+    [' and ', SOFT], ['agents that do real work.', PURPLE, 'bold']], 2.0, { step: 0.06 });
 
-  // ── the crew reports in ──
-  const done = [];
-  CREW.forEach(({ name, icon, color, sub, note }, i) => {
-    const yc = 166 + i * 56, t0 = 3.3 + i * 0.35, run = 1.3;
-    s.group(t0, () => {
-      s.icon(icon, 40, yc - 17, 3, color);
-      if (icon === 'wifi') s.icon('slash', 40, yc - 17, 3, PINK);
-      s.pixel(84, yc - 17, name, 2.2, TEXT);
-      s.text(84, yc + 12, sub, { color: DIM, size: 10.5 });
+  // ── built so far ──
+  s.group(3.0, () => {
+    s.pixel(40, 150, 'BUILT SO FAR', 1.8, DIM);
+    s.add(`<line x1="${40 + pixelWidth('BUILT SO FAR', 1.8) + 12} " y1="156" x2="450" y2="156" stroke="${BORDER}"/>`);
+  });
+  BUILT.forEach(({ name, icon, color, where, what }, i) => {
+    const y = 180 + i * 50;
+    s.group(3.2 + i * 0.3, () => {
+      s.icon(icon, 40, y, 2.5, color);
+      s.pixel(80, y + 1, name, 2, TEXT);
+      s.text(80 + pixelWidth(name, 2) + 12, y + 12, where, { color: DIM, size: 10 });
+      s.text(80, y + 31, what, { color: SOFT, size: 11.5 });
     }, { mode: 'flicker', shake: 2 });
-    s.group(t0 + 0.1, () => s.progress(250, 400, yc - 9, color, t0 + 0.15, run));
-    s.group(t0 + 0.25, () => s.text(250, yc + 12, note, { color: DIM, size: 10 }));
-    done.push(t0 + 0.15 + run);
-    s.group(done[i], () => s.pixel(414, yc - 19, 'OK', 3, color), { mode: 'flicker', shake: 2 });
   });
 
-  // Card 1 — nothing leaves the laptop
-  let c = done[0] + 0.05;
-  card(s, 0, c, 'OFFLINE', 'MindWell', () => {
-    s.pixelCounter(16, 40, ['412KB', '96KB', '12KB', '3KB', '0 BYTES'], c + 1.2, 4, GREEN);
-    s.group(c + 1.25, () => s.text(16, 83, 'of your chats leave the laptop', { color: SOFT, size: 10.5 }));
-    s.text(16, 99, 'on-device', { color: DIM, size: 9.5 });
-    s.add(`<rect x="76" y="93" width="118" height="5" rx="2.5" fill="${TRACK}"/>`);
-    s.grow(76, 93, 118, 5, GREEN, c + 0.3, 0.9, { rx: 2.5 });
-    s.group(c + 1.2, () => s.text(222, 99, '100%', { color: GREEN, size: 9.5, weight: 'bold', anchor: 'end' }));
-  });
-
-  // Card 2 — a hackathon timeline
-  c = done[1] + 0.05;
-  card(s, 1, c, 'HACKATHONS', '2025-26', () => {
-    s.add(`<line x1="22" y1="62" x2="214" y2="62" stroke="${TRACK}" stroke-width="2"/>`);
-    s.draw('M22 62H214', 192, c + 0.15, 0.9, BLUE, { width: 2 });
-    [[40, 'Gemma 3n', 'solo'], [118, 'Q-Hack', '24 h'], [196, 'Berlin', '36 h']].forEach(([x, top, bot], k) => {
-      const tk = c + 0.3 + k * 0.28;
-      s.pop(x, 62, BLUE, tk);
-      s.group(tk + 0.05, () => {
-        s.text(x, 50, top, { color: TEXT, size: 10, weight: 'bold', anchor: 'middle' });
-        s.text(x, 80, bot, { color: DIM, size: 9.5, anchor: 'middle' });
-      });
-    });
-    s.group(c + 1.25, () => s.text(16, 100, '3 hackathons. 3 shipped.', { color: SOFT, size: 10.5 }));
-  });
-
-  // Card 3 — an agent's wallet, one paid tool call at a time
-  c = done[2] + 0.05;
-  card(s, 2, c, 'WALLET', 'mcpay', () => {
-    // cumulative spend: 23 paid calls of uneven price, under a $0.005 budget line
-    const x0 = 16, x1 = 110, y0 = 90, yBudget = 42, budget = 0.005;
-    const cost = [2, 1, 1, 3, 1, 2, 1, 1, 1, 2, 1, 1, 1, 3, 1, 1, 2, 1, 1, 1, 2, 1, 1];
-    const unit = 0.0037 / cost.reduce((a, b) => a + b);
-    const yOf = v => r1(y0 - (y0 - yBudget) * v / budget);
-    let d = `M${x0} ${y0}`, spent = 0;
-    cost.forEach((k, j) => { spent += k * unit; d += `H${r1(x0 + (x1 - x0) * (j + 1) / cost.length)}V${yOf(spent)}`; });
-    s.add(`<path d="M${x0} 36V${y0}H${x1 + 4}" fill="none" stroke="${BORDER}"/>`);
-    s.add(`<path d="M${x0} ${yBudget}H${x1 + 4}" stroke="${PINK}" stroke-opacity="0.7" stroke-dasharray="3 3"/>`);
-    s.text(x1 + 4, yBudget - 4, 'budget', { color: PINK, size: 8.5, anchor: 'end' });
-    s.group(c + 1.4, () => s.add(`<path d="${d}H${x1}V${y0}Z" fill="${YELLOW}" fill-opacity="0.12"/>`));
-    s.draw(d, 200, c + 0.2, 1.2, YELLOW, { width: 1.5 });
-    s.group(c + 0.2, () => s.text(x0, 103, '23 paid calls', { color: DIM, size: 9 }));
-    s.pixelCounter(126, 44, ['$0.0000', '$0.0009', '$0.0018', '$0.0027', '$0.0037'], c + 1.4, 2.2, YELLOW);
-    s.group(c + 1.45, () => {
-      s.text(126, 78, 'spent by an agent', { color: SOFT, size: 10 });
-      s.text(126, 93, 'on its own tools', { color: SOFT, size: 10 });
+  // ── right now ──
+  const px0 = 480, pw = 480, py0 = 140, ph = 232;
+  s.group(3.4, () => {
+    s.add(`<rect x="${px0}" y="${py0}" width="${pw}" height="${ph}" rx="8" fill="${CARD}" stroke="${BORDER}"/>`);
+    s.add(`<path d="M${px0} ${py0 + 8}a8 8 0 0 1 8-8v${ph}a8 8 0 0 1-8-8z" fill="${BLUE}"/>`);
+    s.pixel(px0 + 20, py0 + 16, 'RIGHT NOW', 2, TEXT);
+    s.add(`<circle cx="${px0 + pw - 52}" cy="${py0 + 23}" r="3.5" fill="${GREEN}" filter="url(#glow)">` +
+      '<animate attributeName="opacity" values="1;0.25;1" dur="1.6s" repeatCount="indefinite"/></circle>');
+    s.text(px0 + pw - 20, py0 + 27, 'live', { color: GREEN, size: 11, weight: 'bold', anchor: 'end' });
+  }, { mode: 'flicker', shake: 3 });
+  NOW.forEach(([what, detail], i) => {
+    const y = py0 + 62 + i * 44;
+    s.group(3.7 + i * 0.3, () => {
+      s.add(`<rect x="${px0 + 20}" y="${y - 9}" width="6" height="6" fill="${BLUE}"/>`);
+      s.text(px0 + 36, y - 2, what, { color: TEXT, size: 13, weight: 'bold' });
+      s.text(px0 + 36, y + 15, detail, { color: DIM, size: 10.5 });
+      s.busy(px0 + pw - 100, y - 8, 76, BLUE, i * 0.45);
     });
   });
 
-  // Card 4 — 4K vs the 1080p fast mode, raced side by side
-  c = done[3] + 0.05;
-  card(s, 3, c, 'SPEEDRUN', 'HDR2SDR', () => {
-    const bx = 72, bw = 118, fast = 0.4;
-    [['4K', 40, fast * 5.5, DIM], ['1080p', 58, fast, ORANGE]].forEach(([label, y, dur, color]) => {
-      s.text(16, y + 6, label, { color: SOFT, size: 10 });
-      s.add(`<rect x="${bx}" y="${y}" width="${bw}" height="7" rx="3.5" fill="${TRACK}"/>`);
-      s.grow(bx, y, bw, 7, color, c + 0.25, dur, { rx: 3.5 });
-      s.group(c + 0.25 + dur, () => s.text(222, y + 7, 'done', { color, size: 9.5, weight: 'bold', anchor: 'end' }));
+  // ── fluent in / into ──
+  const chipRow = (y, label, items, color, start) => {
+    s.group(start, () => s.pixel(40, y - 6, label, 1.8, DIM));
+    let x = COL;
+    items.forEach((item, i) => {
+      const w = Math.round(item.length * 6.6 + 22);
+      s.group(start + 0.1 + i * 0.08, () => {
+        s.add(`<rect x="${x}" y="${y - 10}" width="${w}" height="23" rx="11.5" fill="${color}" fill-opacity="0.08" stroke="${color}" stroke-opacity="0.45"/>`);
+        s.text(x + w / 2, y + 5, item, { color, size: 11, anchor: 'middle' });
+      }, { mode: 'flicker', shake: 1.5 });
+      x += w + 8;
     });
-    s.group(c + 0.3 + fast, () => s.pixel(16, 78, '5.5x FASTER', 2.2, ORANGE), { mode: 'flicker', shake: 2 });
-  });
-
-  // ── the guardrail is not used to this ──
-  s.line(406, 'guardrail', ORANGE, [["0 cloud calls detected. that's suspicious. requesting API key...", SOFT]], 7.9, { step: 0.06 });
-  s.line(432, 'agent', PURPLE, [['there is no API key. ', SOFT], ['it runs on his laptop.', TEXT, 'bold']], 9.4, { step: 0.08 });
-
-  // ── the answer ──
-  s.line(474, 'agent', PURPLE, [['Mirang builds AI that works for you, ', TEXT], ['even with the Wi-Fi off.', GREEN, 'bold']],
-    10.6, { step: 0.09, size: 17, font: SANS });
-  s.stamp(866, 500, 'SHIPPED', ORANGE, 12.1);
-
-  s.words(COL, 526, [['(side quests: rebuilding git in Rust, German at A2. wird schon.) ', DIM], ['say hi ', GREEN, 'bold']],
-    12.9, { step: 0.06, size: 12, cursor: GREEN });
+  };
+  chipRow(408, 'FLUENT IN', FLUENT, BLUE, 5.0);
+  chipRow(446, 'INTO', INTO, GREEN, 5.8);
 }
 
 function build() {
   const anim = new Svg(true), stat = new Svg(false);
   session(anim);
   session(stat);
-  const shake = `<animateTransform attributeName="transform" type="translate" values="0 0;-5 2;4 -2;-2 1;1 0;0 0" ` +
-    `dur="0.3s" begin="${at(12.1)}" calcMode="discrete"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img"
-     aria-label="A self-playing terminal session answering: who is Mirang? Mirang Bhandari builds AI that works for you, even with the Wi-Fi off.">
+     aria-label="A self-playing terminal session answering: who is Mirang? Mirang Bhandari builds offline AI apps and AI agents. Built so far: MindWell, mcpay, TenderFlow, HDR2SDR. Right now: an MSc in Applied Data Science &amp; AI at SRH Heidelberg, AI/ML research at Deutsche Bank, learning Rust, and offline desktop apps. Fluent in Python, TypeScript, JavaScript, SQL, React, LangGraph, MCP and Ollama.">
 <title>who is Mirang? - a self-playing agent session</title>
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0f141b"/><stop offset="1" stop-color="${BG}"/></linearGradient>
@@ -431,7 +344,7 @@ function build() {
 <rect width="${W}" height="${H}" fill="url(#bg)"/>
 <rect width="${W}" height="${H}" fill="url(#grid)"/>
 <rect width="0" height="0"><animate id="loop" attributeName="x" from="0" to="0" dur="${LOOP}s" begin="0s;loop.end" restart="always"/></rect>
-<g class="anim"><set attributeName="opacity" to="1" begin="loop.begin"/><animate attributeName="opacity" from="1" to="0" begin="${at(LOOP - 0.6)}" dur="0.5s" fill="freeze"/><g>${shake}
+<g class="anim"><set attributeName="opacity" to="1" begin="loop.begin"/><animate attributeName="opacity" from="1" to="0" begin="${at(LOOP - 0.6)}" dur="0.5s" fill="freeze"/><g>
 ${anim.out.join('\n')}
 </g></g>
 <g class="static">
