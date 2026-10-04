@@ -1,21 +1,11 @@
 ![who is Mirang? - a self-playing agent session](assets/banner.svg)
 
-# 🐦‍🔥 Mirang Bhandari
-<img align="right" src="https://github.com/Bloodwingv2/GithubAssets/blob/main/cat-computer.gif" width="120" />
+<p align="center">
+  <img src="assets/views.svg" alt="Profile views" height="44">&nbsp;
+  <a href="https://agent-folio.vercel.app/"><img src="assets/link-portfolio.svg" alt="Portfolio" height="44"></a>&nbsp;
+  <a href="https://www.linkedin.com/in/mirangbhandari/"><img src="assets/link-linkedin.svg" alt="LinkedIn" height="44"></a>&nbsp;
+  <a href="https://x.com/Angrycoder97"><img src="assets/link-x.svg" alt="X" height="44"></a>
+</p>
 
-**Software Engineer | GenAI · Agents · Full-Stack**
-
-I build AI that runs where you need it: offline on your laptop, inside your tools, or paying its own way :)
-
-## Currently working on..
-
-> **Learning Rust** by rebuilding Git from scratch, just to see how it works <br>
-> **Building offline AI desktop apps** using Electron <br>
-> **Designing agentic systems** for the agentic era of coding
-
-> *Will ship offline-first* · *The Why: models should work for you, even with the Wi-Fi off*
-
-[Portfolio](https://agent-folio.vercel.app/) • [LinkedIn](https://www.linkedin.com/in/mirangbhandari/) • [GitHub](https://github.com/mirb-404)
-
----
-![Profile Views](https://komarev.com/ghpvc/?username=Bloodwingv2&label=Profile+Views&color=blue&style=flat)
+<!-- keeps the view counter counting; views.svg above shows the number -->
+<img src="https://komarev.com/ghpvc/?username=Bloodwingv2" width="1" height="1" alt="">

@@ -4,6 +4,10 @@
  * Everything animates with SMIL + CSS inside the SVG, so it plays on GitHub with no
  * JavaScript at view time. Visitors who prefer reduced motion get the finished frame.
  *
+ * It also builds the footer row in the same style: a profile-views chip and the social-link
+ * buttons. The view count comes from komarev.com, which counts every fetch as a view, so it
+ * is only fetched in CI (or with --views) and CI's own fetches are subtracted.
+ *
  * Edit the SCRIPT section near the bottom and run:  node make_banner.js
  */
 const fs = require('fs');
@@ -48,7 +52,8 @@ const FONT = {
   '?': '01110 10001 00001 00010 00100 00000 00100', '!': '00100 00100 00100 00100 00100 00000 00100',
   '.': '00000 00000 00000 00000 00000 01100 01100', '$': '00100 01111 10100 01110 00101 11110 00100',
   '-': '00000 00000 00000 11111 00000 00000 00000', '+': '00000 00100 00100 11111 00100 00100 00000',
-  x: '00000 00000 10001 01010 00100 01010 10001', ' ': '00000 00000 00000 00000 00000 00000 00000',
+  x: '00000 00000 10001 01010 00100 01010 10001', ',': '00000 00000 00000 00000 01100 00100 01000',
+  ' ': '00000 00000 00000 00000 00000 00000 00000',
 };
 
 // Pixel icons (1 = lit). Drawn with the same run-merging as the font.
@@ -61,6 +66,12 @@ const ICONS = {
     '00011111000', '00001110000', '00001110000', '00111111100'],
   coin: ['00011111000', '00110001100', '01101110110', '01011111010', '01011111010',
     '01011111010', '01101110110', '00110001100', '00011111000'],
+  eye: ['00011111000', '01100000110', '11001110011', '10011111001', '11001110011',
+    '01100000110', '00011111000'],
+  window: ['111111111', '111111111', '100000001', '101110001', '100000001', '101111101',
+    '100000001', '111111111'],
+  linkedin: ['100000', '000000', '101110', '101001', '101001', '101001', '101001'],
+  xlogo: ['1000001', '0100010', '0010100', '0001000', '0010100', '0100010', '1000001'],
   bolt: ['00000011110', '00000111100', '00001111000', '00011111110', '00111111100',
     '00000111000', '00001110000', '00011100000', '00011000000'],
 };
@@ -435,7 +446,94 @@ ${stat.out.join('\n')}
 `;
 }
 
-const out = path.join(__dirname, 'assets', 'banner.svg');
-fs.mkdirSync(path.dirname(out), { recursive: true });
-fs.writeFileSync(out, build(), 'utf8');
-console.log(`wrote ${out} (${Math.round(fs.statSync(out).size / 1024)} KB)`);
+// ── footer row: profile views + links ───────────────────────────────────────
+const VIEWS_USER = 'Bloodwingv2'; // the komarev counter that has been counting since day one
+const LINKS = [
+  { file: 'link-portfolio.svg', label: 'PORTFOLIO', icon: 'window', color: PURPLE },
+  { file: 'link-linkedin.svg', label: 'LINKEDIN', icon: 'linkedin', color: BLUE },
+  { file: 'link-x.svg', label: 'ANGRYCODER97', icon: 'xlogo', color: TEXT },
+];
+const CHIP_H = 44;
+
+// A small card in the banner's style. A light sheen sweeps across it now and then.
+function chip(w, color, title, body) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${CHIP_H}" width="${w}" height="${CHIP_H}" role="img" aria-label="${esc(title)}">
+<title>${esc(title)}</title>
+<defs>
+  <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.5" stop-color="#fff" stop-opacity="0.07"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="1" fill="#000" opacity="0.12"/></pattern>
+  <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <clipPath id="c"><rect width="${w}" height="${CHIP_H}" rx="6"/></clipPath>
+  <style>.anim { } @media (prefers-reduced-motion: reduce) { .anim { display: none; } }</style>
+</defs>
+<g clip-path="url(#c)">
+<rect width="${w}" height="${CHIP_H}" fill="${CARD}"/>
+<rect width="4" height="${CHIP_H}" fill="${color}"/>
+${body}
+<rect width="${w}" height="${CHIP_H}" fill="url(#scan)"/>
+<g class="anim"><rect x="-80" width="60" height="${CHIP_H}" fill="url(#sheen)" transform="skewX(-20)"><animate attributeName="x" values="-80;${w + 40};${w + 40}" keyTimes="0;0.25;1" dur="6s" repeatCount="indefinite"/></rect></g>
+</g>
+<rect x="0.5" y="0.5" width="${w - 1}" height="${CHIP_H - 1}" rx="6" fill="none" stroke="${BORDER}"/>
+</svg>
+`;
+}
+
+function linkChip({ label, icon, color }) {
+  const px = 2.5, iconW = ICONS[icon][0].length * px, lx = 16 + iconW + 12, lw = pixelWidth(label, 2.2);
+  const w = Math.round(lx + lw + 48);
+  const body = `<path d="${bitmapPath(ICONS[icon], 16, (CHIP_H - ICONS[icon].length * px) / 2, px)}" fill="${color}"/>
+<path d="${[...label].map((ch, i) => bitmapPath(glyphRows(ch), lx + i * 6 * 2.2, 14.3, 2.2)).join('')}" fill="${TEXT}"/>
+<text x="${w - 14}" y="27" font-family="${MONO}" font-size="13" font-weight="bold" fill="${color}" text-anchor="end">-&gt;</text>`;
+  return chip(w, color, label, body);
+}
+
+// The count lands with a quick roll-up, once per page view
+function viewsChip(count) {
+  const n = Number(count.replace(/\D/g, '')) || 0;
+  const fmt = v => Math.round(v).toLocaleString('en-US');
+  const label = 'PROFILE VIEWS', px = 3, eyeW = 11 * 2.5;
+  const lx = 16 + eyeW + 12, nx = lx + pixelWidth(label, 1.6) + 16;
+  const w = Math.round(nx + pixelWidth(fmt(n), px) + 34);
+  const num = (v, color) => `<path d="${[...fmt(v)].map((ch, i) => bitmapPath(glyphRows(ch), nx + i * 6 * px, 11.5, px)).join('')}" fill="${color}"/>`;
+  const steps = [0, 0.35, 0.6, 0.78, 0.9, 0.96, 1].map(f => n * f);
+  const roll = steps.map((v, i) => {
+    const last = i === steps.length - 1, t0 = (0.3 + i * 0.12).toFixed(2);
+    const hide = last ? '' : `<set attributeName="visibility" to="hidden" begin="${(0.3 + (i + 1) * 0.12).toFixed(2)}s"/>`;
+    return `<g visibility="hidden"><set attributeName="visibility" to="visible" begin="${t0}s"/>${hide}${num(v, last ? GREEN : SOFT)}</g>`;
+  }).join('');
+  const body = `<path d="${bitmapPath(ICONS.eye, 16, (CHIP_H - 7 * 2.5) / 2, 2.5)}" fill="${GREEN}"/>
+<path d="${[...label].map((ch, i) => bitmapPath(glyphRows(ch), lx + i * 6 * 1.6, 16.4, 1.6)).join('')}" fill="${DIM}"/>
+<g class="anim">${roll}</g>
+<style>.still { display: none; } @media (prefers-reduced-motion: reduce) { .still { display: inline; } }</style>
+<g class="still">${num(n, GREEN)}</g>
+<circle cx="${w - 16}" cy="${CHIP_H / 2}" r="3" fill="${GREEN}" filter="url(#glow)"><animate attributeName="opacity" values="1;0.25;1" dur="2s" repeatCount="indefinite"/></circle>`;
+  return chip(w, GREEN, `Profile views: ${fmt(n)}`, body);
+}
+
+async function fetchViews() {
+  const res = await fetch(`https://komarev.com/ghpvc/?username=${VIEWS_USER}&style=for-the-badge`);
+  const m = (await res.text()).match(/aria-label="[^"]*?:\s*([\d,]+)"/);
+  if (!m) throw new Error('could not read the view count');
+  // every scheduled run is one fetch, so the run number is how many views CI added itself
+  const ownHits = Number(process.env.GITHUB_RUN_NUMBER) || 0;
+  return String(Number(m[1].replace(/\D/g, '')) - ownHits);
+}
+
+async function main() {
+  const dir = path.join(__dirname, 'assets');
+  fs.mkdirSync(dir, { recursive: true });
+  const write = (name, svg) => {
+    fs.writeFileSync(path.join(dir, name), svg, 'utf8');
+    console.log(`wrote assets/${name} (${Math.round(Buffer.byteLength(svg) / 1024)} KB)`);
+  };
+  write('banner.svg', build());
+  LINKS.forEach(l => write(l.file, linkChip(l)));
+  if (!process.env.GITHUB_ACTIONS && !process.argv.includes('--views')) return; // don't count our own builds
+  try {
+    write('views.svg', viewsChip(await fetchViews()));
+  } catch (e) {
+    console.warn(`views.svg not updated: ${e.message}`); // keep the last good count
+  }
+}
+
+main();
