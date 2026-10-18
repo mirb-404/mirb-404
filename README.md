@@ -8,7 +8,7 @@ Building **AI-powered, fully offline applications** and **agentic workflows**. P
 ## Currently working on..
 
 > **Learning Rust** by rebuilding Git clone from scratch to understand Git and improve performance <br>
-> **Building offline AI desktop apps** using Electron/Tauriv2
+> **Building offline AI desktop apps** using Electron/Tauriv2 <br>
 > **Designing Agentic systems** for the Agentic Era of coding
 ---
 ![Profile Views](https://komarev.com/ghpvc/?username=Bloodwingv2&label=Profile+Views&color=blue&style=flat)
