@@ -11,4 +11,4 @@ Building **AI-powered, fully offline applications** and **agentic workflows**. P
 > **Building offline AI desktop apps** using Electron  
 > **Designing Agentic systems** for the Agentic Era of coding
 ---
-![Profile Views](https://komarev.com/ghpvc/?username=mirb-404&label=Profile+Views&color=blue&style=flat)
+![Profile Views](https://komarev.com/ghpvc/?username=Bloodwingv2&label=Profile+Views&color=blue&style=flat)
